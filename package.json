@@ -1,0 +1,21 @@
+{
+  "name": "aws-deploy-nodejs",
+  "version": "1.0.0",
+  "main": "bin/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "aws-deploy-nodejs": "./bin/index.js"
+  },
+  "author": "Anuj Thakur",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.682.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "yargs": "^17.7.2"
+  }
+}
