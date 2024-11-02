@@ -23,6 +23,9 @@ lib-cov
 coverage
 *.lcov
 
+# CSV files
+*.csv
+
 # nyc test coverage
 .nyc_output
 

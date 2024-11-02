@@ -13,3 +13,47 @@ const usage = chalk(
             dimBorder: true,
         })
 );
+
+const options = yargs
+    .usage(usage)
+    .options({
+        t: {
+            alias: "title",
+            describe: "enter title of the instance",
+            type: "string",
+            demandOption: true,
+        },
+        it: {
+            alias: "instance_type",
+            describe: "type of instance, e.g. t2.micro",
+            type: "string",
+            demandOption: true,
+        },
+        i: {
+            alias: "instance_id",
+            describe: "enter the instance id if to be deployed on a specific instance",
+            type: "string",
+            demandOption: false,
+        },
+    })
+    .help(true).argv;
+
+const main = async () => {
+    try {
+        
+        process.exit(0);
+    } catch (error) {
+        console.log(
+            "\n" +
+                boxen(chalk.green("\n" + error + "\n"), {
+                    padding: 1,
+                    borderColor: "red",
+                    dimBorder: true,
+                }) +
+                "\n"
+        );
+        process.exit(1);
+    }
+};
+
+main();
