@@ -4,7 +4,7 @@ const {
     DescribeInstancesCommand,
     waitUntilInstanceStatusOk,
 } = require("@aws-sdk/client-ec2");
-const { SSMClient, SendCommandCommand } = require("@aws-sdk/client-ssm");
+const { SSMClient, SendCommandCommand, GetCommandInvocationCommand } = require("@aws-sdk/client-ssm");
 const { fromEnv } = require("@aws-sdk/credential-providers");
 
 const { aws } = require("../config/keys");
@@ -32,32 +32,6 @@ class Aws {
 
     async createInstance(title = null, instanceType = "t2.micro") {
         try {
-            // User data script to install SSM agent
-            const userData = Buffer.from(
-                `
-                    #!/bin/bash
-                    # Update package lists
-                    apt-get update -y
-                    
-                    # Install necessary dependencies
-                    apt-get install -y \
-                        unzip \
-                        wget \
-                        curl
-                    
-                    # Install SSM agent for Ubuntu
-                    snap install amazon-ssm-agent --classic
-                    systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
-                    systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
-                    
-                    # Install git
-                    apt-get install -y git
-                    
-                    # Set up instance
-                    apt-get upgrade -y
-                `
-            ).toString("base64");
-
             const params = {
                 ImageId: aws.ami,
                 InstanceType: instanceType,
@@ -65,7 +39,6 @@ class Aws {
                 MaxCount: 1,
                 SecurityGroupIds: [aws.securityGroup],
                 TagSpecifications: [],
-                UserData: userData,
                 IamInstanceProfile: {
                     Name: aws.iamRole,
                 },
@@ -113,12 +86,10 @@ class Aws {
             );
             console.log(`Instance ${instanceId} is up and running`);
             const commands = [
-                "sudo apt update -y",
-                "sudo apt upgrade -y",
-                "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh",
-                "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash",
-                "source ~/.bashrc",
-                "nvm install 20",
+                "cd /root",
+                "sudo apt update -y && sudo apt upgrade -y",
+                "sudo apt install -y nodejs",
+                "sudo apt install -y npm",
                 "npm install -g pm2",
             ];
 
@@ -132,16 +103,55 @@ class Aws {
 
             const command = new SendCommandCommand(params);
             const res = await Aws.#ssmClient.send(command);
-            return res;
+            const commandId = res.Command.CommandId;
+            console.log(`sent command ${commandId} to setup the instance`);
+            let status;
+            do {
+                const invocationParams = {
+                    CommandId: commandId,
+                    InstanceId: instanceId,
+                };
+
+                const invocation = await Aws.#ssmClient.send(
+                    new GetCommandInvocationCommand(invocationParams)
+                );
+                status = invocation.Status;
+
+                if (status === "Success") {
+                    console.log("Commands executed successfully");
+                    return res;
+                }
+                if (status === "Failed") {
+                    console.error("Commands failed to execute");
+                    return res;
+                }
+
+                // Wait before polling again
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+            } while (status === "InProgress" || status === "Pending");
         } catch (error) {
             console.log("error setting up the environment for nodejs", error);
+        }
+    }
+
+    async getCommandDetails(commandId, instanceId) {
+        const params = {
+            CommandId: commandId,
+            InstanceId: instanceId,
+        };
+        try {
+            const result = await Aws.#ssmClient.send(new GetCommandInvocationCommand(params));
+            console.log(result);
+        } catch (error) {
+            console.log("error fetching command status", error);
         }
     }
 
     async deployProject(instanceId, repositoryUrl, isTypescript) {
         try {
             const projectName = extractProjectName(repositoryUrl);
-            const commands = [`git clone ${repositoryUrl}`, `cd ${projectName}`, "npm install"];
+            console.log("cloning", repositoryUrl);
+            const commands = ["cd /root", `git clone ${repositoryUrl}`, `cd ${projectName}`, "npm install"];
             if (isTypescript) {
                 commands.push("npm i -g typescript", "tsc", "pm2 start dist/index.js --name backend -i max");
             } else {
@@ -158,6 +168,33 @@ class Aws {
 
             const command = new SendCommandCommand(params);
             const res = await Aws.#ssmClient.send(command);
+            const commandId = res.Command.CommandId;
+            console.log(`sent command ${commandId} to deploy the project`);
+
+            let status;
+            do {
+                const invocationParams = {
+                    CommandId: commandId,
+                    InstanceId: instanceId,
+                };
+
+                const invocation = await Aws.#ssmClient.send(
+                    new GetCommandInvocationCommand(invocationParams)
+                );
+                status = invocation.Status;
+
+                if (status === "Success") {
+                    console.log("Commands executed successfully");
+                    return res;
+                }
+                if (status === "Failed") {
+                    console.error("Commands failed to execute");
+                    return res;
+                }
+
+                // Wait before polling again
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+            } while (status === "InProgress" || status === "Pending");
             return res;
         } catch (error) {
             console.log("error deploying the project", error);
