@@ -34,3 +34,9 @@ Steps to use:
 ## Demo Video
 https://github.com/user-attachments/assets/e1cabe48-52f3-4bf6-8c10-0e3b76012030
 
+
+## Contributions
+- Fork the repo and clone it locally
+- Setup the ```.env``` file and install the command globally
+- Create a new branch for the feature you're going to add 
+- Push your changes and raise a PR
