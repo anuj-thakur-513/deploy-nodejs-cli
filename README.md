@@ -28,4 +28,5 @@ Steps:
 
 
 ## Demo Video
-![](/github_assets/AWS%20Deploy%20nodejs%20CLI.mov)
+https://github.com/user-attachments/assets/e1cabe48-52f3-4bf6-8c10-0e3b76012030
+
