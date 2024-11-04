@@ -28,4 +28,4 @@ Steps:
 
 
 ## Demo Video
-![](/github_assets/AWS%20Deploy%20nodejs%20CLI.mp4)
+![](/github_assets/AWS%20Deploy%20nodejs%20CLI.mov)
