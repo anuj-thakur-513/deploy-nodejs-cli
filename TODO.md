@@ -1,0 +1,2 @@
+- Add deployment for Frontend Projects
+- Add deployment for Docker Projects
