@@ -1,4 +1,3 @@
-const fs = require("fs");
 const {
     EC2Client,
     RunInstancesCommand,
