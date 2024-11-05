@@ -184,7 +184,7 @@ class Aws {
             const command = new SendCommandCommand(params);
             const res = await Aws.#ssmClient.send(command);
             const commandId = res.Command.CommandId;
-            console.log(`sent command ${commandId} to clone the project`);
+            console.log(`sent command ${commandId} to deploy the project`);
 
             let status;
             do {
