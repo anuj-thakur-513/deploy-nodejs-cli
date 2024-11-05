@@ -19,11 +19,11 @@ class Aws {
         if (!Aws.#instance) {
             Aws.#instance = new Aws();
             Aws.#ec2Client = new EC2Client({
-                region: "us-east-1",
+                region: aws.region,
                 credentials: fromEnv(),
             });
             Aws.#ssmClient = new SSMClient({
-                region: "us-east-1",
+                region: aws.region,
                 credentials: fromEnv(),
             });
         }
