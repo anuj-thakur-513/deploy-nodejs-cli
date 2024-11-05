@@ -7,8 +7,8 @@ const boxen = require("boxen");
 const Aws = require("../services/AWS");
 
 const usage = chalk(
-    "\nUsage: aws-deploy-nodejs -r <public_repository_url> -ts <true or false flag for typescript> -t <title_of_instance> -it <instance type, e.g. t2.micro> -i <instance_id>\n" +
-        boxen(chalk.green("\nDeploys a nodejs project to AWS\n"), {
+    "\nUsage: aws-deploy-nodejs -r <public_repository_url> -ts <true or false flag for typescript> -e <environment variables> -t <title_of_instance> -it <instance type, e.g. t2.micro> -i <instance_id>\n" +
+        boxen(chalk.green.bold("\nDeploys a nodejs project to AWS\n"), {
             padding: 1,
             borderColor: "green",
             dimBorder: true,
@@ -28,6 +28,12 @@ const options = yargs
             alias: "is_typescript",
             describe: "enter true or false flag for typescript",
             type: "boolean",
+            demandOption: true,
+        },
+        e: {
+            alias: "env",
+            describe: "enter the environment variables",
+            type: "array",
             demandOption: true,
         },
         t: {
@@ -54,7 +60,7 @@ const options = yargs
 const main = async () => {
     try {
         const aws = Aws.getInstance();
-        let { public_repository_url, is_typescript, title, instance_type, instance_id } = yargs.argv;
+        let { public_repository_url, is_typescript, env, title, instance_type, instance_id } = yargs.argv;
         if (!instance_id) {
             console.log("creating ec2 instance");
             let res;
@@ -74,7 +80,7 @@ const main = async () => {
         await aws.setupInstance(instance_id);
         console.log("instance setup successfull");
         console.log("cloning and deploying project");
-        await aws.deployProject(instance_id, public_repository_url, is_typescript);
+        await aws.deployProject(instance_id, public_repository_url, is_typescript, env);
         console.log("project deployed successfully");
 
         const publicIp = await aws.getInstancePublicIp(instance_id);

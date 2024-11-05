@@ -1,3 +1,4 @@
+const fs = require("fs");
 const {
     EC2Client,
     RunInstancesCommand,
@@ -147,17 +148,31 @@ class Aws {
         }
     }
 
-    async deployProject(instanceId, repositoryUrl, isTypescript) {
+    async deployProject(instanceId, repositoryUrl, isTypescript, env) {
         try {
             const projectName = extractProjectName(repositoryUrl);
             console.log("cloning", repositoryUrl);
-            const commands = ["cd /root", `git clone ${repositoryUrl}`, `cd ${projectName}`, "npm install"];
+            const commands = [
+                "cd /root",
+                `git clone ${repositoryUrl}`,
+                `cd ${projectName}`,
+                "touch .env",
+                `echo "${env.join("\n")}" > .env`,
+                "npm install",
+            ];
             if (isTypescript) {
-                commands.push("npm i -g typescript", "tsc", "pm2 start dist/index.js --name backend -i max");
+                commands.push(
+                    "npm i -g typescript",
+                    "tsc",
+                    "sudo pm2 start dist/index.js --name backend -i max"
+                );
             } else {
-                commands.push("pm2 start src/index.js --name backend -i max");
+                commands.push(
+                    "sudo pm2 start src/index.js --name backend -i max"
+                );
             }
 
+            console.log("cloning and deploying project");
             const params = {
                 InstanceIds: [instanceId],
                 DocumentName: "AWS-RunShellScript",
@@ -169,7 +184,7 @@ class Aws {
             const command = new SendCommandCommand(params);
             const res = await Aws.#ssmClient.send(command);
             const commandId = res.Command.CommandId;
-            console.log(`sent command ${commandId} to deploy the project`);
+            console.log(`sent command ${commandId} to clone the project`);
 
             let status;
             do {
@@ -195,7 +210,6 @@ class Aws {
                 // Wait before polling again
                 await new Promise((resolve) => setTimeout(resolve, 5000));
             } while (status === "InProgress" || status === "Pending");
-            return res;
         } catch (error) {
             console.log("error deploying the project", error);
         }
