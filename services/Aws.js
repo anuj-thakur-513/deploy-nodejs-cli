@@ -65,6 +65,7 @@ class Aws {
       return res;
     } catch (error) {
       console.log("error creating an ec2 instance", error);
+      process.exit(1);
     }
   }
 
@@ -92,6 +93,7 @@ class Aws {
       const commands = [
         "cd /root",
         "sudo apt update -y && sudo apt upgrade -y",
+        "sudo apt install -y nginx",
         "sudo apt install -y nodejs",
         "sudo apt install -y npm",
         "npm install -g pm2",
@@ -135,6 +137,7 @@ class Aws {
       } while (status === "InProgress" || status === "Pending");
     } catch (error) {
       console.log("error setting up the environment for nodejs", error);
+      process.exit(1);
     }
   }
 
@@ -151,7 +154,7 @@ class Aws {
     }
   }
 
-  async deployProject(instanceId, repositoryUrl, isTypescript, env) {
+  async cloneRepo(instanceId, repositoryUrl, env) {
     try {
       const projectName = extractProjectName(repositoryUrl);
       console.log("cloning", repositoryUrl);
@@ -159,21 +162,68 @@ class Aws {
         "cd /root",
         `git clone ${repositoryUrl}`,
         `cd ${projectName}`,
-        "touch .env",
-        `echo "${env.join("\n")}" > .env`,
         "npm install",
+        "npm i -g typescript",
       ];
-      if (isTypescript) {
-        commands.push(
-          "npm i -g typescript",
-          "tsc",
-          "sudo pm2 start dist/index.js --name backend -i max"
+
+      if (env) {
+        commands.push("touch .env", `echo "${env.join("\n")}" > .env`);
+      }
+
+      const params = {
+        InstanceIds: [instanceId],
+        DocumentName: "AWS-RunShellScript",
+        Parameters: {
+          commands: commands,
+        },
+      };
+
+      const command = new SendCommandCommand(params);
+      const res = await Aws.#ssmClient.send(command);
+      const commandId = res.Command.CommandId;
+      console.log(`sent command ${commandId} to clone ${repositoryUrl}`);
+
+      let status;
+      do {
+        const invocationParams = {
+          CommandId: commandId,
+          InstanceId: instanceId,
+        };
+
+        const invocation = await Aws.#ssmClient.send(
+          new GetCommandInvocationCommand(invocationParams)
         );
+        status = invocation.Status;
+
+        if (status === "Success") {
+          console.log("Commands executed successfully");
+          return res;
+        }
+        if (status === "Failed") {
+          console.error("Commands failed to execute");
+          return res;
+        }
+
+        // Wait before polling again
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } while (status === "InProgress" || status === "Pending");
+    } catch (error) {
+      console.log(`error while cloning ${repositoryUrl}`, error);
+      process.exit(1);
+    }
+  }
+
+  async deployBackend(instanceId, repositoryUrl, isTypescript, env) {
+    try {
+      const projectName = extractProjectName(repositoryUrl);
+      console.log("cloning", repositoryUrl);
+      const commands = [`cd /root/${projectName}`];
+      if (isTypescript) {
+        commands.push("tsc", "sudo pm2 start dist/index.js --name backend -i max");
       } else {
         commands.push("sudo pm2 start src/index.js --name backend -i max");
       }
 
-      console.log("cloning and deploying project");
       const params = {
         InstanceIds: [instanceId],
         DocumentName: "AWS-RunShellScript",
@@ -213,6 +263,79 @@ class Aws {
       } while (status === "InProgress" || status === "Pending");
     } catch (error) {
       console.log("error deploying the project", error);
+      process.exit(1);
+    }
+  }
+
+  async deployFrontend(instanceId, repositoryUrl, env) {
+    try {
+      const projectName = extractProjectName(repositoryUrl);
+      const nginxDir = projectName + "-frontend";
+      const commands = [
+        "cd /root",
+        `sudo mkdir /var/www/${nginxDir}`,
+        `cd ${projectName}`,
+        `npm run build`,
+        `sudo cp -R dist/* /var/www/${nginxDir}/`,
+        "cd /root",
+        // sed is used to search and replace strings in a file
+        // TODO: fix this sed command, this is not working yet (Will continue working on this tomorrow)
+        `sudo sed -i '/include \\/etc\\/nginx\\/sites-enabled\\/\\*;/ s/^/# /' /etc/nginx/nginx.conf`,
+        `touch /etc/nginx/conf.d/${nginxDir}.conf`,
+        // adding configuration for nginx frontend
+        `echo 'server {
+        listen 80;
+        listen [::]:80;
+        root /var/www/${nginxDir};
+
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+        }' | sudo tee /etc/nginx/conf.d/${nginxDir}.conf > /dev/null`,
+        // test NGINX config && restart NGINX server
+        "sudo systemctl daemon-reload",
+        "sudo nginx -t && sudo systemctl reload nginx",
+      ];
+
+      const params = {
+        InstanceIds: [instanceId],
+        DocumentName: "AWS-RunShellScript",
+        Parameters: {
+          commands: commands,
+        },
+      };
+
+      const command = new SendCommandCommand(params);
+      const res = await Aws.#ssmClient.send(command);
+      const commandId = res.Command.CommandId;
+      console.log(`sent command ${commandId} to deploy frontend`);
+      let status;
+      do {
+        const invocationParams = {
+          CommandId: commandId,
+          InstanceId: instanceId,
+        };
+
+        const invocation = await Aws.#ssmClient.send(
+          new GetCommandInvocationCommand(invocationParams)
+        );
+        status = invocation.Status;
+
+        if (status === "Success") {
+          console.log("Commands executed successfully");
+          return res;
+        }
+        if (status === "Failed") {
+          console.error("Commands failed to execute");
+          return res;
+        }
+
+        // Wait before polling again
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } while (status === "InProgress" || status === "Pending");
+    } catch (error) {
+      console.log("error while deploying frontend", error);
+      process.exit(1);
     }
   }
 }
