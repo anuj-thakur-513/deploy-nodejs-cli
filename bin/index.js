@@ -7,7 +7,7 @@ const boxen = require("boxen");
 const Aws = require("../services/AWS");
 
 const usage = chalk(
-  "\nUsage: aws-deploy-nodejs -r <public_repository_url> -ts <true or false flag for typescript> -e <environment variables> -t <title_of_instance> -it <instance type, e.g. t2.micro> -i <instance_id>\n" +
+  "\nUsage: aws-deploy-nodejs -r <public_repository_url> --ts <true or false flag for typescript> --fe <true or false flag for frontend codebase> -e <environment variables> -t <title_of_instance> --it <instance type, e.g. t2.micro> -i <instance_id>\n" +
     boxen(chalk.green.bold("\nDeploys a nodejs project to AWS\n"), {
       padding: 1,
       borderColor: "green",
@@ -34,7 +34,7 @@ const options = yargs
       alias: "env",
       describe: "enter the environment variables",
       type: "array",
-      demandOption: true,
+      demandOption: false,
     },
     t: {
       alias: "title",
@@ -54,14 +54,28 @@ const options = yargs
       type: "string",
       demandOption: false,
     },
+    fe: {
+      alias: "is_frontend",
+      describe: "enter true or false flag for frontend codebase",
+      type: "boolean",
+      demandOption: true,
+    },
   })
   .help(true).argv;
 
 const main = async () => {
   try {
     const aws = Aws.getInstance();
-    let { public_repository_url, is_typescript, env, title, instance_type, instance_id } =
-      yargs.argv;
+    let {
+      public_repository_url,
+      is_typescript,
+      is_frontend,
+      env,
+      title,
+      instance_type,
+      instance_id,
+    } = yargs.argv;
+
     if (!instance_id) {
       console.log("creating ec2 instance");
       let res;
@@ -79,10 +93,17 @@ const main = async () => {
     }
     console.log("setting up instance for node.js project");
     await aws.setupInstance(instance_id);
-    console.log("instance setup successfull");
-    console.log("cloning and deploying project");
-    await aws.deployProject(instance_id, public_repository_url, is_typescript, env);
-    console.log("project deployed successfully");
+    console.log("setup complete");
+    await aws.cloneRepo(instance_id, public_repository_url, env);
+    console.log('repo cloned successfully');
+
+    if (!is_frontend) {
+      await aws.deployBackend(instance_id, public_repository_url, is_typescript, env);
+      console.log("backend deployed successfully");
+    } else {
+      await aws.deployFrontend(instance_id, public_repository_url, env);
+      console.log("frontend deployed successfully");
+    }
 
     const publicIp = await aws.getInstancePublicIp(instance_id);
     console.log(
