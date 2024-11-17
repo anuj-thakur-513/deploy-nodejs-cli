@@ -279,7 +279,6 @@ class Aws {
         `sudo cp -R dist/* /var/www/${nginxDir}/`,
         "cd /root",
         // sed is used to search and replace strings in a file
-        // TODO: fix this sed command, this is not working yet (Will continue working on this tomorrow)
         `sudo sed -i '/include \\/etc\\/nginx\\/sites-enabled\\/\\*;/ s/^/# /' /etc/nginx/nginx.conf`,
         `touch /etc/nginx/conf.d/${nginxDir}.conf`,
         // adding configuration for nginx frontend
