@@ -8,12 +8,7 @@ Steps to use:
     - AmazonSSMFullAccess
     - AmazonSSMManagedInstanceCore
     - AmazonIAMFullAccess
-
-- Create an IAM Profile with following permissions:
-    - AmazonEC2FullAccess
-    - AmazonSSMFullAccess
-    - AmazonSSMManagedInstanceCore
-    - AmazonEC2RoleforSSM
+    - 
 
 - If you want to host on an already existing instance, attach the IAM profile to that instance otherwise nothing required
 
